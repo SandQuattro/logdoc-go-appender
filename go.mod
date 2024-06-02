@@ -1,4 +1,4 @@
-module github.com/LogDoc-org/logdoc-go-appender
+module github.com/SandQuattro/logdoc-go-appender
 
 go 1.20
 
