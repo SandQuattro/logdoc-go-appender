@@ -1,6 +1,7 @@
 package logrusld
 
 import (
+	"errors"
 	"fmt"
 	"github.com/LogDoc-org/logdoc-go-appender/common"
 	"github.com/sirupsen/logrus"
@@ -23,6 +24,13 @@ var log = logrus.StandardLogger()
 func GetLogger() *logrus.Logger {
 	return log
 }
+
+var UnknownLogFormatError = errors.New("unknown log format")
+
+const (
+	JSON = iota
+	TEXT
+)
 
 type Hook struct {
 	sync.RWMutex
@@ -113,14 +121,31 @@ func (h *Hook) sendMessage(entry *logrus.Entry) error {
 	return nil
 }
 
-func Init(proto string, address string, app string) (net.Conn, error) {
+func Init(proto string, address string, app string, format int) (net.Conn, error) {
 	log.SetReportCaller(true)
-	log.Formatter = &logrus.JSONFormatter{
-		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
-			filename := path.Base(f.File)
-			return fmt.Sprintf("%s:%d", filename, f.Line), fmt.Sprintf("%s()", f.Function)
-		},
-		TimestampFormat: "02-01-2006 15:04:05.00000",
+
+	switch format {
+	case JSON:
+		log.Formatter = &logrus.JSONFormatter{
+			CallerPrettyfier: func(f *runtime.Frame) (string, string) {
+				filename := path.Base(f.File)
+				return fmt.Sprintf("%s:%d", filename, f.Line), fmt.Sprintf("%s()", f.Function)
+			},
+			TimestampFormat: "02-01-2006 15:04:05.00000",
+		}
+	case TEXT:
+		log.Formatter = &logrus.TextFormatter{
+			ForceColors:     true,
+			ForceQuote:      true,
+			FullTimestamp:   true,
+			TimestampFormat: "02.01.2006 15:04:05.000000",
+			CallerPrettyfier: func(f *runtime.Frame) (string, string) {
+				filename := path.Base(f.File)
+				return fmt.Sprintf(" %s:%d", filename, f.Line), "" // fmt.Sprintf("%s()", f.Function)
+			},
+		}
+	default:
+		return nil, UnknownLogFormatError
 	}
 
 	log.SetLevel(logrus.DebugLevel)
