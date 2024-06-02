@@ -2,14 +2,15 @@ package zapld
 
 import (
 	"fmt"
-	"github.com/SandQuattro/logdoc-go-appender/common"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"net"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/SandQuattro/logdoc-go-appender/common"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var application string

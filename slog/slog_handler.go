@@ -3,13 +3,14 @@ package slogld
 import (
 	"context"
 	"fmt"
-	"github.com/SandQuattro/logdoc-go-appender/common"
 	"log/slog"
 	"net"
 	"os"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/SandQuattro/logdoc-go-appender/common"
 )
 
 var log *slog.Logger
@@ -46,6 +47,10 @@ func NewLogdocHandler(
 		application: application,
 		connection:  conn,
 	}
+}
+
+func GetLogger() *slog.Logger {
+	return log
 }
 
 // Enabled reports whether the handler handles records at the given level.

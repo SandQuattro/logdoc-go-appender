@@ -3,8 +3,6 @@ package logrusld
 import (
 	"errors"
 	"fmt"
-	"github.com/SandQuattro/logdoc-go-appender/common"
-	"github.com/sirupsen/logrus"
 	"net"
 	"os"
 	"path"
@@ -13,6 +11,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/SandQuattro/logdoc-go-appender/common"
+	"github.com/sirupsen/logrus"
 )
 
 const defaultAsyncBufferSize = 8192
