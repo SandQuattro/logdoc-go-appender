@@ -13,7 +13,7 @@ import (
 	"github.com/SandQuattro/logdoc-go-appender/common"
 )
 
-var log *slog.Logger
+var log = slog.Default()
 
 // LogdocHandler is a Handler that writes log records to the Logdoc.
 type LogdocHandler struct {
