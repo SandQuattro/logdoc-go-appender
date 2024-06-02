@@ -3,7 +3,7 @@ package logrusld
 import (
 	"errors"
 	"fmt"
-	"github.com/LogDoc-org/logdoc-go-appender/common"
+	"github.com/SandQuattro/logdoc-go-appender/common"
 	"github.com/sirupsen/logrus"
 	"net"
 	"os"
