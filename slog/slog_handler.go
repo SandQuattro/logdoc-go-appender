@@ -2,52 +2,81 @@ package slogld
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
 	"os"
 	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/SandQuattro/logdoc-go-appender/common"
+	slogcommon "github.com/samber/slog-common"
 )
+
+var _ slog.Handler = (*LogdocHandler)(nil)
 
 var log = slog.Default()
 
-// LogdocHandler is a Handler that writes log records to the Logdoc.
-type LogdocHandler struct {
-	slog.Handler
-	levels      []slog.Level
-	proto       string
-	address     string
-	application string
-	Connection  net.Conn
+type Option struct {
+	// log level (default: debug)
+	Level slog.Leveler
+
+	// connection to logdoc
+	Conn net.Conn
+
+	// application name in logdoc
+	app string
+
+	// optional: customize json payload builder
+	Converter Converter
+
+	// optional: custom marshaler
+	Marshaler func(v any) ([]byte, error)
+
+	// optional: fetch attributes from context
+	AttrFromContext []func(ctx context.Context) []slog.Attr
+
+	// optional: see slog.HandlerOptions
+	AddSource   bool
+	ReplaceAttr func(groups []string, a slog.Attr) slog.Attr
 }
 
-// NewLogdocHandler creates a LogdocHandler that writes to w,
-// using the given options.
-func NewLogdocHandler(
-	handler slog.Handler,
-	levels []slog.Level,
-	proto, address, application string,
-) *LogdocHandler {
+// LogdocHandler is a Handler that writes log records to the Logdoc.
+type LogdocHandler struct {
+	option Option
+	attrs  []slog.Attr
+	groups []string
+}
 
-	conn, err := networkWriter(proto, address)
-	if err != nil {
-		log.Error("Ошибка соединения с LogDoc сервером")
-		return nil
+// NewLogdocHandler creates a LogdocHandler using the given option.
+func (o Option) NewLogdocHandler() slog.Handler {
+	if o.Level == nil {
+		o.Level = slog.LevelDebug
+	}
+
+	if o.Conn == nil {
+		panic("missing logdoc connection")
+	}
+
+	if o.Converter == nil {
+		o.Converter = DefaultConverter
+	}
+
+	if o.Marshaler == nil {
+		o.Marshaler = json.Marshal
+	}
+
+	if o.AttrFromContext == nil {
+		o.AttrFromContext = []func(ctx context.Context) []slog.Attr{}
 	}
 
 	return &LogdocHandler{
-		Handler:     handler,
-		levels:      levels,
-		proto:       proto,
-		address:     address,
-		application: application,
-		Connection:  conn,
+		option: o,
+		attrs:  []slog.Attr{},
+		groups: []string{},
 	}
 }
 
@@ -59,50 +88,40 @@ func SetLogger(logger *slog.Logger) {
 	log = logger
 }
 
-// Enabled reports whether the handler handles records at the given level.
-func (s *LogdocHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	return s.Handler.Enabled(ctx, level)
+func (h *LogdocHandler) Enabled(_ context.Context, level slog.Level) bool {
+	return level >= h.option.Level.Level()
 }
 
 // Handle intercepts and processes logger messages.
 // In our case, send a message to the Logdoc.
-func (s *LogdocHandler) Handle(ctx context.Context, record slog.Record) error {
-	const (
-		shortErrKey = "err"
-		longErrKey  = "error"
-	)
+func (h *LogdocHandler) Handle(ctx context.Context, record slog.Record) error {
+	fromContext := slogcommon.ContextExtractor(ctx, h.option.AttrFromContext)
+	message := h.option.Converter(h.option.AddSource, h.option.ReplaceAttr, append(h.attrs, fromContext...), h.groups, &record)
 
-	if slices.Contains(s.levels, record.Level) {
-		switch record.Level {
-		case slog.LevelError:
-			record.Attrs(func(attr slog.Attr) bool {
-				if attr.Key == shortErrKey || attr.Key == longErrKey {
-					if err, ok := attr.Value.Any().(error); ok {
-						s.sendLogDocErrorEvent(err)
-					}
-				}
+	go func() {
+		h.sendLogDocEvent(message)
+	}()
 
-				return true
-			})
-		case slog.LevelDebug, slog.LevelInfo, slog.LevelWarn:
-			s.sendLogDocEvent(record)
-		}
+	return nil
+}
+
+func (h *LogdocHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &LogdocHandler{
+		option: h.option,
+		attrs:  slogcommon.AppendAttrsToGroup(h.groups, h.attrs, attrs...),
+		groups: h.groups,
 	}
-
-	return s.Handler.Handle(ctx, record)
 }
 
-// WithAttrs returns a new LogdocHandler whose attributes consists.
-func (s *LogdocHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return NewLogdocHandler(s.Handler.WithAttrs(attrs), s.levels, s.proto, s.address, s.application)
+func (h *LogdocHandler) WithGroup(name string) slog.Handler {
+	return &LogdocHandler{
+		option: h.option,
+		attrs:  h.attrs,
+		groups: append(h.groups, name),
+	}
 }
 
-// WithGroup returns a new LogdocHandler whose group consists.
-func (s *LogdocHandler) WithGroup(name string) slog.Handler {
-	return NewLogdocHandler(s.Handler.WithGroup(name), s.levels, s.proto, s.address, s.application)
-}
-
-func (s *LogdocHandler) sendLogDocEvent(entry slog.Record) {
+func (h *LogdocHandler) sendLogDocEvent(entry *slog.Record) {
 	var lvl string
 	if strings.Compare(entry.Level.String(), "warning") == 0 {
 		lvl = "warn"
@@ -110,14 +129,14 @@ func (s *LogdocHandler) sendLogDocEvent(entry slog.Record) {
 		lvl = entry.Level.String()
 	}
 
-	go s.sendLogdoc(lvl, &entry, nil)
+	go h.sendLogdoc(lvl, entry, nil)
 }
 
-func (s *LogdocHandler) sendLogDocErrorEvent(err error) {
-	go s.sendLogdoc(slog.LevelError.String(), nil, err)
+func (h *LogdocHandler) sendLogDocErrorEvent(err error) {
+	go h.sendLogdoc(slog.LevelError.String(), nil, err)
 }
 
-func (s *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) {
+func (h *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) {
 	header := []byte{6, 3}
 
 	var msg string
@@ -127,9 +146,9 @@ func (s *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) 
 		msg = err.Error()
 	}
 
-	app := s.application
+	app := h.option.app
 
-	ip := s.Connection.RemoteAddr().String()
+	ip := h.option.Conn.RemoteAddr().String()
 	pid := fmt.Sprintf("%d", os.Getpid())
 
 	var src string
@@ -162,41 +181,9 @@ func (s *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) 
 	// Финальный байт, завершаем
 	result = append(result, []byte("\n")...)
 
-	_, e := s.Connection.Write(result)
+	_, e := h.option.Conn.Write(result)
 	if e != nil {
 		log.Error("Ошибка записи в соединение, ", e)
 	}
 
-}
-
-func networkWriter(proto string, address string) (net.Conn, error) {
-	switch {
-	case proto == "tcp":
-		return tcpWriter(address)
-	case proto == "udp":
-		return udpWriter(address)
-	default:
-		log.With("address", address).Error("Error connecting LogDoc server")
-		return nil, fmt.Errorf("error accessing LogDoc server, %s", address)
-	}
-}
-
-// функция для создания TCP соединения и возврата io.Writer
-func tcpWriter(address string) (net.Conn, error) {
-	conn, err := net.Dial("tcp", address)
-	if err != nil {
-		log.With("address", address).Error("Error connecting LogDoc server using tcp")
-		return nil, err
-	}
-	return conn, nil
-}
-
-// функция для создания UDP соединения и возврата io.Writer
-func udpWriter(address string) (net.Conn, error) {
-	conn, err := net.Dial("udp", address)
-	if err != nil {
-		log.With("address", address).Error("Error connecting LogDoc server using udp")
-		return nil, err
-	}
-	return conn, nil
 }
