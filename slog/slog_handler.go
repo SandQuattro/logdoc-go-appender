@@ -6,7 +6,9 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -126,9 +128,15 @@ func (s *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) 
 	ip := s.Connection.RemoteAddr().String()
 	pid := fmt.Sprintf("%d", os.Getpid())
 
-	// TODO: обработать фреймы
-	src := "TODO"
-	// src := runtime.CallersFrames([]uintptr{entry.PC})
+	var src string
+	if entry != nil {
+		f := runtime.FuncForPC(entry.PC)
+		_, line := f.FileLine(entry.PC)
+		src = f.Name() + ":" + strconv.Itoa(line)
+	} else {
+		// TODO: обработать фреймы ошибки
+		src = "TODO"
+	}
 
 	t := time.Now()
 	tsrc := t.Format("060201150405.000") + "\n"
