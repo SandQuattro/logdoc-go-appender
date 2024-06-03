@@ -55,6 +55,10 @@ func GetLogger() *slog.Logger {
 	return log
 }
 
+func SetLogger(logger *slog.Logger) {
+	log = logger
+}
+
 // Enabled reports whether the handler handles records at the given level.
 func (s *LogdocHandler) Enabled(ctx context.Context, level slog.Level) bool {
 	return s.Handler.Enabled(ctx, level)
