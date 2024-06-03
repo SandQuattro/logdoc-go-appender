@@ -22,7 +22,7 @@ type LogdocHandler struct {
 	proto       string
 	address     string
 	application string
-	connection  net.Conn
+	Connection  net.Conn
 }
 
 // NewLogdocHandler creates a LogdocHandler that writes to w,
@@ -45,7 +45,7 @@ func NewLogdocHandler(
 		proto:       proto,
 		address:     address,
 		application: application,
-		connection:  conn,
+		Connection:  conn,
 	}
 }
 
@@ -123,7 +123,7 @@ func (s *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) 
 
 	app := s.application
 
-	ip := s.connection.RemoteAddr().String()
+	ip := s.Connection.RemoteAddr().String()
 	pid := fmt.Sprintf("%d", os.Getpid())
 
 	// TODO: обработать фреймы
@@ -150,7 +150,7 @@ func (s *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) 
 	// Финальный байт, завершаем
 	result = append(result, []byte("\n")...)
 
-	_, e := s.connection.Write(result)
+	_, e := s.Connection.Write(result)
 	if e != nil {
 		log.Error("Ошибка записи в соединение, ", e)
 	}
