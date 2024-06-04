@@ -132,10 +132,6 @@ func (h *LogdocHandler) sendLogDocEvent(entry *slog.Record) {
 	go h.sendLogdoc(lvl, entry, nil)
 }
 
-func (h *LogdocHandler) sendLogDocErrorEvent(err error) {
-	go h.sendLogdoc(slog.LevelError.String(), nil, err)
-}
-
 func (h *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) {
 	header := []byte{6, 3}
 
@@ -169,7 +165,7 @@ func (h *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) 
 	// Записываем само сообщение
 	common.WritePair("msg", msg, &result)
 	// Обрабатываем кастомные поля
-	common.ProcessCustomFields(msg, &result)
+	result = processCustomFields(entry, result)
 	// Служебные поля
 	common.WritePair("app", app, &result)
 	common.WritePair("tsrc", tsrc, &result)
@@ -186,4 +182,14 @@ func (h *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) 
 		log.Error("Ошибка записи в соединение, ", e)
 	}
 
+}
+
+func processCustomFields(record *slog.Record, result []byte) []byte {
+	// Обработка кастом полей
+	record.Attrs(func(attr slog.Attr) bool {
+		result = append(result, []byte(attr.Key+"="+attr.Value.Any().(string)+"\n")...)
+		return true
+	})
+
+	return result
 }
