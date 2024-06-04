@@ -187,7 +187,10 @@ func (h *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) 
 func processCustomFields(record *slog.Record, result []byte) []byte {
 	// Обработка кастом полей
 	record.Attrs(func(attr slog.Attr) bool {
-		result = append(result, []byte(attr.Key+"="+attr.Value.Any().(string)+"\n")...)
+		key, val := slogcommon.AttrToValue(attr)
+		if v, ok := val.(string); ok {
+			result = append(result, []byte(key+"="+v+"\n")...)
+		}
 		return true
 	})
 
