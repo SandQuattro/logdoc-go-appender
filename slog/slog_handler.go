@@ -28,7 +28,7 @@ type Option struct {
 	Conn net.Conn
 
 	// application name in logdoc
-	app string
+	Application string
 
 	// optional: customize json payload builder
 	Converter Converter
@@ -59,6 +59,10 @@ func (o Option) NewLogdocHandler() slog.Handler {
 
 	if o.Conn == nil {
 		panic("missing logdoc connection")
+	}
+
+	if o.Application == "" {
+		panic("missing application name")
 	}
 
 	if o.Converter == nil {
@@ -142,7 +146,7 @@ func (h *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) 
 		msg = err.Error()
 	}
 
-	app := h.option.app
+	app := h.option.Application
 
 	ip := h.option.Conn.RemoteAddr().String()
 	pid := fmt.Sprintf("%d", os.Getpid())
