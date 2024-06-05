@@ -154,8 +154,11 @@ func (h *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) 
 	var src string
 	if entry != nil {
 		f := runtime.FuncForPC(entry.PC)
-		_, line := f.FileLine(entry.PC)
-		src = f.Name() + ":" + strconv.Itoa(line)
+		src = f.Name()
+		if h.option.AddSource {
+			_, line := f.FileLine(entry.PC)
+			entry.AddAttrs(slog.String("source", src+":"+strconv.Itoa(line)))
+		}
 	} else {
 		// TODO: обработать фреймы ошибки
 		src = "TODO"
