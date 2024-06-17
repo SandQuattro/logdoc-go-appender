@@ -165,7 +165,7 @@ func (h *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) 
 	}
 
 	t := time.Now()
-	tsrc := t.Format("060102150405.00000") + "\n"
+	tsrc := t.Format("060102150405.000") + "\n"
 	tsrc = strings.ReplaceAll(tsrc, ".", "")
 
 	// Пишем заголовок
