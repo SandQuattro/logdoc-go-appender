@@ -20,15 +20,16 @@ const (
 
 var application string
 var connection net.Conn
-var log zerolog.Logger
+var log *zerolog.Logger
 
 // init инициализирует логгер по умолчанию с уровнем debug
 func init() {
-	log = zerolog.New(os.Stdout).
+	defaultLogger := zerolog.New(os.Stdout).
 		With().
 		Timestamp().
 		Logger().
 		Level(zerolog.DebugLevel)
+	log = &defaultLogger
 }
 
 // LogdocHook реализует интерфейс zerolog.Hook для отправки логов в LogDoc
@@ -79,12 +80,12 @@ func (h LogdocHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
 }
 
 // GetLogger возвращает текущий логгер
-func GetLogger() zerolog.Logger {
+func GetLogger() *zerolog.Logger {
 	return log
 }
 
 // SetLogger устанавливает новый логгер
-func SetLogger(logger zerolog.Logger) {
+func SetLogger(logger *zerolog.Logger) {
 	log = logger
 }
 
@@ -121,7 +122,7 @@ func Init(proto string, address string, app string, level zerolog.Level, format 
 		Level(level).
 		Hook(hook)
 
-	log = newLogger
+	log = &newLogger
 
 	log.Info().Msg("LogDoc subsystem initialized successfully")
 
