@@ -2,6 +2,7 @@ package zerologld
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"runtime"
@@ -9,6 +10,12 @@ import (
 
 	"github.com/SandQuattro/logdoc-go-appender/common"
 	"github.com/rs/zerolog"
+)
+
+// Константы для выбора формата вывода
+const (
+	JSON = 0
+	TEXT = 1
 )
 
 var application string
@@ -82,7 +89,7 @@ func SetLogger(logger zerolog.Logger) {
 }
 
 // Init инициализирует zerolog с подключением к LogDoc
-func Init(proto string, address string, app string, level zerolog.Level) (net.Conn, error) {
+func Init(proto string, address string, app string, level zerolog.Level, format int) (net.Conn, error) {
 	// Создаем соединение
 	conn, err := networkWriter(proto, address)
 	if err != nil {
@@ -98,8 +105,16 @@ func Init(proto string, address string, app string, level zerolog.Level) (net.Co
 		Application: app,
 	}
 
+	// Выбираем writer в зависимости от формата
+	var writer io.Writer
+	if format == TEXT {
+		writer = zerolog.ConsoleWriter{Out: os.Stdout}
+	} else {
+		writer = os.Stdout
+	}
+
 	// Настраиваем базовый логгер
-	log = zerolog.New(os.Stdout).
+	log = zerolog.New(writer).
 		With().
 		Timestamp().
 		Logger().

@@ -9,7 +9,7 @@ import (
 
 func main() {
 	// Инициализируем zerolog с подключением к LogDoc
-	conn, err := zerologld.Init("tcp", "localhost:9999", "zerolog-example", zerolog.InfoLevel)
+	conn, err := zerologld.Init("tcp", "localhost:9999", "zerolog-example", zerolog.InfoLevel, zerologld.JSON)
 	if err != nil {
 		panic(err)
 	}
