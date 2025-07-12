@@ -113,13 +113,15 @@ func Init(proto string, address string, app string, level zerolog.Level, format 
 		writer = os.Stdout
 	}
 
-	// Настраиваем базовый логгер
-	log = zerolog.New(writer).
+	// Настраиваем базовый логгер и обновляем глобальную переменную
+	newLogger := zerolog.New(writer).
 		With().
 		Timestamp().
 		Logger().
 		Level(level).
 		Hook(hook)
+
+	log = newLogger
 
 	log.Info().Msg("LogDoc subsystem initialized successfully")
 
