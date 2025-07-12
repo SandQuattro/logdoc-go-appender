@@ -75,7 +75,8 @@ func GetStack(skip int) []byte {
 	// loaded file.
 	var lines [][]byte
 	var lastFile string
-	for i := skip; ; i++ { // Skip the expected number of frames
+	for i := skip; ; i++ {
+		// skip [runtime.Callers, this function, this function's caller]
 		programCounter, file, line, ok := runtime.Caller(i)
 		if !ok {
 			break

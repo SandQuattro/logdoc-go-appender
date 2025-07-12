@@ -3,7 +3,10 @@ package common
 import (
 	"bytes"
 	"fmt"
+	"net"
+	"os"
 	"strings"
+	"time"
 )
 
 func WritePair(key string, value string, arr *[]byte) {
@@ -71,4 +74,60 @@ func GetSourceName(pc uintptr, file string, line int, ok bool) string {
 func GetSourceLineNum(pc uintptr, file string, line int, ok bool) int {
 	// in skip if we're using 1, so it will actually log the where the error happened, 0 = this function
 	return line
+}
+
+// NormalizeLogLevel нормализует уровень логирования (warning -> warn)
+func NormalizeLogLevel(level string) string {
+	if strings.Compare(level, "warning") == 0 {
+		return "warn"
+	}
+	return level
+}
+
+// FormatTimestamp форматирует временную метку для LogDoc
+func FormatTimestamp() string {
+	t := time.Now()
+	tsrc := t.Format("060102150405.000") + "\n"
+	return strings.ReplaceAll(tsrc, ".", "")
+}
+
+// GetLogDocHeader возвращает стандартный заголовок для LogDoc
+func GetLogDocHeader() []byte {
+	return []byte{6, 3}
+}
+
+// GetProcessInfo возвращает информацию о процессе (PID и IP)
+func GetProcessInfo(conn net.Conn) (string, string) {
+	pid := fmt.Sprintf("%d", os.Getpid())
+	ip := conn.RemoteAddr().String()
+	return pid, ip
+}
+
+// BuildLogDocMessage строит полное сообщение для LogDoc
+func BuildLogDocMessage(msg, app, level, src string, conn net.Conn, customFieldsProcessor func(*[]byte)) []byte {
+	header := GetLogDocHeader()
+	pid, ip := GetProcessInfo(conn)
+	tsrc := FormatTimestamp()
+	normalizedLevel := NormalizeLogLevel(level)
+
+	// Пишем заголовок
+	result := header
+	// Записываем само сообщение
+	WritePair("msg", msg, &result)
+	// Обрабатываем кастомные поля
+	if customFieldsProcessor != nil {
+		customFieldsProcessor(&result)
+	}
+	// Служебные поля
+	WritePair("app", app, &result)
+	WritePair("tsrc", tsrc, &result)
+	WritePair("lvl", normalizedLevel, &result)
+	WritePair("ip", ip, &result)
+	WritePair("pid", pid, &result)
+	WritePair("src", src, &result)
+
+	// Финальный байт, завершаем
+	result = append(result, []byte("\n")...)
+
+	return result
 }

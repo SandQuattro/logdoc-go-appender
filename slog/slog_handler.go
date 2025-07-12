@@ -3,14 +3,11 @@ package slogld
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net"
-	"os"
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/SandQuattro/logdoc-go-appender/common"
 	slogcommon "github.com/samber/slog-common"
@@ -137,19 +134,12 @@ func (h *LogdocHandler) sendLogDocEvent(entry *slog.Record) {
 }
 
 func (h *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) {
-	header := []byte{6, 3}
-
 	var msg string
 	if entry != nil {
 		msg = entry.Message
 	} else {
 		msg = err.Error()
 	}
-
-	app := h.option.Application
-
-	ip := h.option.Conn.RemoteAddr().String()
-	pid := fmt.Sprintf("%d", os.Getpid())
 
 	var src string
 	if entry != nil {
@@ -164,32 +154,24 @@ func (h *LogdocHandler) sendLogdoc(level string, entry *slog.Record, err error) 
 		src = "TODO"
 	}
 
-	t := time.Now()
-	tsrc := t.Format("060102150405.000") + "\n"
-	tsrc = strings.ReplaceAll(tsrc, ".", "")
-
-	// Пишем заголовок
-	result := header
-	// Записываем само сообщение
-	common.WritePair("msg", msg, &result)
-	// Обрабатываем кастомные поля
-	result = processCustomFields(entry, result)
-	// Служебные поля
-	common.WritePair("app", app, &result)
-	common.WritePair("tsrc", tsrc, &result)
-	common.WritePair("lvl", level, &result)
-	common.WritePair("ip", ip, &result)
-	common.WritePair("pid", pid, &result)
-	common.WritePair("src", src, &result)
-
-	// Финальный байт, завершаем
-	result = append(result, []byte("\n")...)
+	// Используем общую функцию для обработки кастомных полей
+	customFieldsProcessor := func(result *[]byte) {
+		*result = processCustomFields(entry, *result)
+	}
+	
+	result := common.BuildLogDocMessage(
+		msg,
+		h.option.Application,
+		level,
+		src,
+		h.option.Conn,
+		customFieldsProcessor,
+	)
 
 	_, e := h.option.Conn.Write(result)
 	if e != nil {
-		log.Error("Ошибка записи в соединение, ", e)
+		log.Error("Ошибка записи в соединение", "error", e)
 	}
-
 }
 
 func processCustomFields(record *slog.Record, result []byte) []byte {

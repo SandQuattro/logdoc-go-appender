@@ -3,10 +3,7 @@ package zapld
 import (
 	"fmt"
 	"net"
-	"os"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/SandQuattro/logdoc-go-appender/common"
 	"go.uber.org/zap"
@@ -80,37 +77,21 @@ func Init(config *zap.Config, initialLevel zapcore.Level, proto string, address 
 }
 
 func sendLogDocEvent(entry zapcore.Entry) error {
-	header := []byte{6, 3}
-	app := application
-	var lvl string
-	if strings.Compare(entry.Level.String(), "warning") == 0 {
-		lvl = "warn"
-	} else {
-		lvl = entry.Level.String()
-	}
-	ip := connection.RemoteAddr().String()
-	pid := fmt.Sprintf("%d", os.Getpid())
 	src := entry.Caller.Function + ":" + strconv.Itoa(entry.Caller.Line)
-
-	t := time.Now()
-	tsrc := t.Format("060201150405.000") + "\n"
-
-	// Пишем заголовок
-	result := header
-	// Записываем само сообщение
-	common.WritePair("msg", entry.Message, &result)
-	// Обрабатываем кастомные поля
-	common.ProcessCustomFields(entry.Message, &result)
-	// Служебные поля
-	common.WritePair("app", app, &result)
-	common.WritePair("tsrc", tsrc, &result)
-	common.WritePair("lvl", lvl, &result)
-	common.WritePair("ip", ip, &result)
-	common.WritePair("pid", pid, &result)
-	common.WritePair("src", src, &result)
-
-	// Финальный байт, завершаем
-	result = append(result, []byte("\n")...)
+	
+	// Используем общую функцию для обработки кастомных полей
+	customFieldsProcessor := func(result *[]byte) {
+		common.ProcessCustomFields(entry.Message, result)
+	}
+	
+	result := common.BuildLogDocMessage(
+		entry.Message,
+		application,
+		entry.Level.String(),
+		src,
+		connection,
+		customFieldsProcessor,
+	)
 
 	_, err := connection.Write(result)
 	if err != nil {
