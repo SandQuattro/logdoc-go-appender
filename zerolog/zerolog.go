@@ -15,6 +15,15 @@ var application string
 var connection net.Conn
 var log zerolog.Logger
 
+// init инициализирует логгер по умолчанию с уровнем debug
+func init() {
+	log = zerolog.New(os.Stdout).
+		With().
+		Timestamp().
+		Logger().
+		Level(zerolog.DebugLevel)
+}
+
 // LogdocHook реализует интерфейс zerolog.Hook для отправки логов в LogDoc
 type LogdocHook struct {
 	Conn        net.Conn

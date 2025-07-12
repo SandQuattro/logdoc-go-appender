@@ -24,6 +24,10 @@ func GetLogger() *logrus.Logger {
 	return log
 }
 
+func SetLogger(logger *logrus.Logger) {
+	log = logger
+}
+
 var UnknownLogFormatError = errors.New("unknown log format")
 
 const (
@@ -82,12 +86,12 @@ func (h *Hook) Fire(entry *logrus.Entry) error {
 
 func (h *Hook) sendMessage(entry *logrus.Entry) error {
 	src := entry.Caller.Function + ":" + strconv.Itoa(entry.Caller.Line)
-	
+
 	// Используем общую функцию для обработки кастомных полей
 	customFieldsProcessor := func(result *[]byte) {
 		common.ProcessCustomFields(entry.Message, result)
 	}
-	
+
 	result := common.BuildLogDocMessage(
 		entry.Message,
 		application,

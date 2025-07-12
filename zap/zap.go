@@ -16,8 +16,20 @@ var log *zap.Logger
 
 var connection net.Conn
 
+// init инициализирует логгер по умолчанию с уровнем debug
+func init() {
+	config := zap.NewDevelopmentConfig()
+	config.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+	logger, _ := config.Build()
+	log = logger
+}
+
 func GetLogger() *zap.Logger {
 	return log
+}
+
+func SetLogger(logger *zap.Logger) {
+	log = logger
 }
 
 // In contexts where performance is nice, but not critical, we are using the SugaredLogger.
@@ -78,12 +90,12 @@ func Init(config *zap.Config, initialLevel zapcore.Level, proto string, address 
 
 func sendLogDocEvent(entry zapcore.Entry) error {
 	src := entry.Caller.Function + ":" + strconv.Itoa(entry.Caller.Line)
-	
+
 	// Используем общую функцию для обработки кастомных полей
 	customFieldsProcessor := func(result *[]byte) {
 		common.ProcessCustomFields(entry.Message, result)
 	}
-	
+
 	result := common.BuildLogDocMessage(
 		entry.Message,
 		application,
