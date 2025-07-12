@@ -113,8 +113,9 @@ func Init(proto string, address string, app string, level zerolog.Level, format 
 
 	conn, err := networkWriter(proto, address)
 	if err != nil {
-
+		return nil, err
 	}
+
 	hook := LogdocHook{
 		Conn:        conn,
 		Application: app,
