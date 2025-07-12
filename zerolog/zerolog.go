@@ -40,6 +40,11 @@ type LogdocHook struct {
 
 // Run выполняется для каждого лог события
 func (h LogdocHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
+	// Проверяем наличие соединения
+	if h.Conn == nil {
+		return
+	}
+
 	// Получаем информацию о вызывающем коде
 	pc, _, line, ok := runtime.Caller(3) // 3 уровня вверх по стеку
 	var src string
@@ -91,42 +96,39 @@ func SetLogger(logger *zerolog.Logger) {
 
 // Init инициализирует zerolog с подключением к LogDoc
 func Init(proto string, address string, app string, level zerolog.Level, format int) (net.Conn, error) {
-	// Создаем соединение
-	conn, err := networkWriter(proto, address)
-	if err != nil {
-		return nil, fmt.Errorf("ошибка соединения с LogDoc сервером: %w", err)
+	var conn net.Conn
+	if proto != "" && address != "" {
+		c, err := networkWriter(proto, address)
+		if err == nil {
+			conn = c
+		}
 	}
 
 	connection = conn
 	application = app
 
-	// Создаем логгер с хуком
 	hook := LogdocHook{
 		Conn:        conn,
 		Application: app,
 	}
 
-	// Выбираем writer в зависимости от формата
-	var writer io.Writer
+	writer := io.Writer(os.Stdout)
 	if format == TEXT {
 		writer = zerolog.ConsoleWriter{Out: os.Stdout}
-	} else {
-		writer = os.Stdout
 	}
 
-	// Настраиваем базовый логгер и обновляем глобальную переменную
-	newLogger := zerolog.New(writer).
+	logger := zerolog.New(writer).
 		With().
 		Timestamp().
 		Logger().
-		Level(level).
-		Hook(hook)
+		Level(level)
 
-	SetLogger(&newLogger)
+	if conn != nil {
+		logger = logger.Hook(hook)
+	}
 
-	log.Info().Msg("LogDoc subsystem initialized successfully")
-
-	return connection, nil
+	SetLogger(&logger)
+	return conn, nil
 }
 
 // networkWriter создает сетевое соединение
