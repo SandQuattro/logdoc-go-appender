@@ -96,21 +96,7 @@ func SetLogger(logger *zerolog.Logger) {
 
 // Init инициализирует zerolog с подключением к LogDoc
 func Init(proto string, address string, app string, level zerolog.Level, format int) (net.Conn, error) {
-	var conn net.Conn
-	if proto != "" && address != "" {
-		c, err := networkWriter(proto, address)
-		if err == nil {
-			conn = c
-		}
-	}
-
-	connection = conn
 	application = app
-
-	hook := LogdocHook{
-		Conn:        conn,
-		Application: app,
-	}
 
 	writer := io.Writer(os.Stdout)
 	if format == TEXT {
@@ -123,11 +109,21 @@ func Init(proto string, address string, app string, level zerolog.Level, format 
 		Logger().
 		Level(level)
 
+	SetLogger(&logger)
+
+	conn, err := networkWriter(proto, address)
+	if err != nil {
+
+	}
+	hook := LogdocHook{
+		Conn:        conn,
+		Application: app,
+	}
+
 	if conn != nil {
 		logger = logger.Hook(hook)
 	}
 
-	SetLogger(&logger)
 	return conn, nil
 }
 
