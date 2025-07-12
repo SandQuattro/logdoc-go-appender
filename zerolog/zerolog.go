@@ -122,7 +122,7 @@ func Init(proto string, address string, app string, level zerolog.Level, format 
 		Level(level).
 		Hook(hook)
 
-	log = &newLogger
+	SetLogger(&newLogger)
 
 	log.Info().Msg("LogDoc subsystem initialized successfully")
 
