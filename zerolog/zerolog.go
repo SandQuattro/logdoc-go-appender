@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path"
 	"runtime"
 	"strconv"
 
@@ -27,6 +28,7 @@ func init() {
 	defaultLogger := zerolog.New(os.Stdout).
 		With().
 		Timestamp().
+		Caller().
 		Logger().
 		Level(zerolog.DebugLevel)
 	log = &defaultLogger
@@ -46,14 +48,16 @@ func (h LogdocHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
 	}
 
 	// Получаем информацию о вызывающем коде
-	pc, _, line, ok := runtime.Caller(3) // 3 уровня вверх по стеку
+	pc, file, line, ok := runtime.Caller(4) // Увеличиваем до 4 уровней
 	var src string
 	if ok {
 		f := runtime.FuncForPC(pc)
+		filename := path.Base(file) // Получаем только имя файла без пути
 		if f != nil {
-			src = f.Name() + ":" + strconv.Itoa(line)
+			functionName := f.Name()
+			src = functionName + ":" + strconv.Itoa(line)
 		} else {
-			src = "unknown"
+			src = filename + ":" + strconv.Itoa(line)
 		}
 	} else {
 		src = "unknown"
@@ -106,6 +110,7 @@ func Init(proto string, address string, app string, level zerolog.Level, format 
 	logger := zerolog.New(writer).
 		With().
 		Timestamp().
+		Caller().
 		Logger().
 		Level(level)
 
@@ -123,6 +128,7 @@ func Init(proto string, address string, app string, level zerolog.Level, format 
 
 	if conn != nil {
 		logger = logger.Hook(hook)
+		SetLogger(&logger) // Обновляем логгер с хуком
 	}
 
 	return conn, nil
